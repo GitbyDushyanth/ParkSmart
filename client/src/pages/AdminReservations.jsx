@@ -14,6 +14,7 @@ export default function AdminReservations() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [cancellingId, setCancellingId] = useState(null);
+  const [completingId, setCompletingId] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
@@ -35,6 +36,7 @@ export default function AdminReservations() {
     if (!window.confirm('Cancel this reservation as admin?')) return;
     setCancellingId(id);
     setError('');
+    setSuccess('');
     try {
       await reservationsAPI.cancel(id);
       setSuccess('Reservation cancelled by admin.');
@@ -43,6 +45,22 @@ export default function AdminReservations() {
       setError(err.response?.data?.error || 'Failed to cancel reservation');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleAdminComplete = async (id, slotNumber) => {
+    if (!window.confirm(`Complete this reservation for slot ${slotNumber} as admin?`)) return;
+    setCompletingId(id);
+    setError('');
+    setSuccess('');
+    try {
+      await reservationsAPI.complete(id);
+      setSuccess(`Reservation for slot ${slotNumber} completed by admin.`);
+      await fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to complete reservation');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -113,7 +131,7 @@ export default function AdminReservations() {
                   <th>Type</th>
                   <th>Status</th>
                   <th>Reserved At</th>
-                  <th>Cancelled At</th>
+                  <th>Ended At</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -130,18 +148,37 @@ export default function AdminReservations() {
                       {new Date(r.reserved_at).toLocaleString()}
                     </td>
                     <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
-                      {r.cancelled_at ? new Date(r.cancelled_at).toLocaleString() : '—'}
+                      {r.completed_at ? (
+                        <span title="Completed at">{new Date(r.completed_at).toLocaleString()}</span>
+                      ) : r.cancelled_at ? (
+                        <span title="Cancelled at">{new Date(r.cancelled_at).toLocaleString()}</span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td>
-                      {r.status === 'active' && (
-                        <button
-                          id={`admin-cancel-res-${r.id}`}
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleAdminCancel(r.id)}
-                          disabled={cancellingId === r.id}
-                        >
-                          {cancellingId === r.id ? '…' : 'Cancel'}
-                        </button>
+                      {r.status === 'active' ? (
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            id={`admin-complete-res-${r.id}`}
+                            className="btn btn-success btn-sm"
+                            onClick={() => handleAdminComplete(r.id, r.slot_number)}
+                            disabled={completingId === r.id || cancellingId === r.id}
+                            title="Complete parking session as admin"
+                          >
+                            {completingId === r.id ? '…' : 'Complete'}
+                          </button>
+                          <button
+                            id={`admin-cancel-res-${r.id}`}
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleAdminCancel(r.id)}
+                            disabled={cancellingId === r.id || completingId === r.id}
+                          >
+                            {cancellingId === r.id ? '…' : 'Cancel'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--color-gray-400)', fontSize: 'var(--font-size-sm)' }}>—</span>
                       )}
                     </td>
                   </tr>

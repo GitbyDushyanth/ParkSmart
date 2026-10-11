@@ -26,6 +26,7 @@ export default function DriverDashboard() {
   const [success, setSuccess] = useState('');
   const [bookingSlot, setBookingSlot] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
+  const [completingId, setCompletingId] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -72,6 +73,22 @@ export default function DriverDashboard() {
       setError(err.response?.data?.error || 'Failed to cancel');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleComplete = async (reservationId, slotNumber) => {
+    if (!window.confirm(`Finish parking at slot ${slotNumber}? This will mark your reservation as completed and release the slot.`)) return;
+    setCompletingId(reservationId);
+    setError('');
+    setSuccess('');
+    try {
+      const { data } = await reservationsAPI.complete(reservationId);
+      setSuccess(`✓ ${data.message || `Parking session for slot ${slotNumber} completed successfully.`}`);
+      await fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to complete parking session');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -162,14 +179,25 @@ export default function DriverDashboard() {
                       {new Date(r.reserved_at).toLocaleString()}
                     </td>
                     <td>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleCancel(r.id)}
-                        disabled={cancellingId === r.id}
-                        id={`cancel-res-${r.id}`}
-                      >
-                        {cancellingId === r.id ? 'Cancelling…' : 'Cancel'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          className="btn btn-success btn-sm"
+                          onClick={() => handleComplete(r.id, r.slot_number)}
+                          disabled={completingId === r.id || cancellingId === r.id}
+                          id={`complete-res-${r.id}`}
+                          title="Finish parking session and release slot"
+                        >
+                          {completingId === r.id ? 'Completing…' : 'Complete Parking'}
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleCancel(r.id)}
+                          disabled={cancellingId === r.id || completingId === r.id}
+                          id={`cancel-res-${r.id}`}
+                        >
+                          {cancellingId === r.id ? 'Cancelling…' : 'Cancel'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

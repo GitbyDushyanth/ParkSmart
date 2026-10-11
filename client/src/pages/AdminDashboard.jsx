@@ -103,6 +103,7 @@ export default function AdminDashboard() {
   const [success, setSuccess] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
+  const [completingId, setCompletingId] = useState(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -135,6 +136,20 @@ export default function AdminDashboard() {
       setError(err.response?.data?.error || 'Failed to cancel reservation');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleAdminComplete = async (id, slotNumber) => {
+    if (!window.confirm(`Complete reservation for slot ${slotNumber} as admin?`)) return;
+    setCompletingId(id);
+    try {
+      await reservationsAPI.complete(id);
+      setSuccess(`Reservation for slot ${slotNumber} completed successfully.`);
+      await fetchStats();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to complete reservation');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -385,15 +400,28 @@ export default function AdminDashboard() {
                           <span className={`badge badge-${r.status}`}>{r.status}</span>
                         </td>
                         <td>
-                          {r.status === 'active' && (
-                            <button
-                              id={`dash-cancel-${r.id}`}
-                              className="btn btn-danger btn-sm"
-                              onClick={() => handleAdminCancel(r.id)}
-                              disabled={cancellingId === r.id}
-                            >
-                              {cancellingId === r.id ? '…' : 'Cancel'}
-                            </button>
+                          {r.status === 'active' ? (
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <button
+                                id={`dash-complete-${r.id}`}
+                                className="btn btn-success btn-sm"
+                                onClick={() => handleAdminComplete(r.id, r.slot_number)}
+                                disabled={completingId === r.id || cancellingId === r.id}
+                                title="Complete parking session"
+                              >
+                                {completingId === r.id ? '…' : 'Complete'}
+                              </button>
+                              <button
+                                id={`dash-cancel-${r.id}`}
+                                className="btn btn-danger btn-sm"
+                                onClick={() => handleAdminCancel(r.id)}
+                                disabled={cancellingId === r.id || completingId === r.id}
+                              >
+                                {cancellingId === r.id ? '…' : 'Cancel'}
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--color-gray-400)', fontSize: 'var(--font-size-sm)' }}>—</span>
                           )}
                         </td>
                       </tr>

@@ -14,6 +14,7 @@ export default function MyReservations() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [cancellingId, setCancellingId] = useState(null);
+  const [completingId, setCompletingId] = useState(null);
   const [filter, setFilter] = useState('all');
 
   const fetchData = useCallback(async () => {
@@ -34,6 +35,7 @@ export default function MyReservations() {
     if (!window.confirm('Are you sure you want to cancel this reservation?')) return;
     setCancellingId(id);
     setError('');
+    setSuccess('');
     try {
       await reservationsAPI.cancel(id);
       setSuccess('Reservation cancelled. The slot is now available for others.');
@@ -42,6 +44,22 @@ export default function MyReservations() {
       setError(err.response?.data?.error || 'Failed to cancel reservation');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleComplete = async (id, slotNumber) => {
+    if (!window.confirm(`Finish parking at slot ${slotNumber}? This will mark your reservation as completed and make the slot available again.`)) return;
+    setCompletingId(id);
+    setError('');
+    setSuccess('');
+    try {
+      const { data } = await reservationsAPI.complete(id);
+      setSuccess(`✓ ${data.message || `Parking session for slot ${slotNumber} completed successfully.`}`);
+      await fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to complete reservation');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -101,7 +119,7 @@ export default function MyReservations() {
                   <th>Type</th>
                   <th>Status</th>
                   <th>Reserved At</th>
-                  <th>Cancelled At</th>
+                  <th>Ended At</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -116,18 +134,37 @@ export default function MyReservations() {
                       {new Date(r.reserved_at).toLocaleString()}
                     </td>
                     <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
-                      {r.cancelled_at ? new Date(r.cancelled_at).toLocaleString() : '—'}
+                      {r.completed_at ? (
+                        <span title="Completed at">{new Date(r.completed_at).toLocaleString()}</span>
+                      ) : r.cancelled_at ? (
+                        <span title="Cancelled at">{new Date(r.cancelled_at).toLocaleString()}</span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td>
-                      {r.status === 'active' && (
-                        <button
-                          id={`cancel-my-res-${r.id}`}
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleCancel(r.id)}
-                          disabled={cancellingId === r.id}
-                        >
-                          {cancellingId === r.id ? 'Cancelling…' : 'Cancel'}
-                        </button>
+                      {r.status === 'active' ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            id={`complete-my-res-${r.id}`}
+                            className="btn btn-success btn-sm"
+                            onClick={() => handleComplete(r.id, r.slot_number)}
+                            disabled={completingId === r.id || cancellingId === r.id}
+                            title="Finish parking and release slot"
+                          >
+                            {completingId === r.id ? 'Completing…' : 'Complete Parking'}
+                          </button>
+                          <button
+                            id={`cancel-my-res-${r.id}`}
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleCancel(r.id)}
+                            disabled={cancellingId === r.id || completingId === r.id}
+                          >
+                            {cancellingId === r.id ? 'Cancelling…' : 'Cancel'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--color-gray-400)', fontSize: 'var(--font-size-sm)' }}>—</span>
                       )}
                     </td>
                   </tr>

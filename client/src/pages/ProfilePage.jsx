@@ -130,6 +130,9 @@ export default function ProfilePage() {
     }
   };
 
+  // Completion state
+  const [completingId, setCompletingId] = useState(null);
+
   const handleCancelReservation = async (reservationId) => {
     if (!window.confirm('Are you sure you want to cancel this reservation?')) return;
     setCancellingId(reservationId);
@@ -140,6 +143,19 @@ export default function ProfilePage() {
       alert(err.response?.data?.error || 'Failed to cancel reservation');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleCompleteReservation = async (reservationId, slotNumber) => {
+    if (!window.confirm(`Finish parking at slot ${slotNumber}? This will mark your reservation as completed and release the slot.`)) return;
+    setCompletingId(reservationId);
+    try {
+      await reservationsAPI.complete(reservationId);
+      await fetchProfileAndReservations();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to complete reservation');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -398,7 +414,7 @@ export default function ProfilePage() {
                   <th>Slot Type</th>
                   <th>Status</th>
                   <th>Booked At</th>
-                  <th>Cancelled At</th>
+                  <th>Ended At</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -414,18 +430,37 @@ export default function ProfilePage() {
                       {new Date(r.reserved_at).toLocaleString()}
                     </td>
                     <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
-                      {r.cancelled_at ? new Date(r.cancelled_at).toLocaleString() : '—'}
+                      {r.completed_at ? (
+                        <span title="Completed at">{new Date(r.completed_at).toLocaleString()}</span>
+                      ) : r.cancelled_at ? (
+                        <span title="Cancelled at">{new Date(r.cancelled_at).toLocaleString()}</span>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td>
-                      {r.status === 'active' && (
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleCancelReservation(r.id)}
-                          disabled={cancellingId === r.id}
-                          id={`profile-cancel-res-${r.id}`}
-                        >
-                          {cancellingId === r.id ? 'Cancelling…' : 'Cancel'}
-                        </button>
+                      {r.status === 'active' ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            className="btn btn-success btn-sm"
+                            onClick={() => handleCompleteReservation(r.id, r.slot_number)}
+                            disabled={completingId === r.id || cancellingId === r.id}
+                            id={`profile-complete-res-${r.id}`}
+                            title="Finish parking and release slot"
+                          >
+                            {completingId === r.id ? 'Completing…' : 'Complete Parking'}
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleCancelReservation(r.id)}
+                            disabled={cancellingId === r.id || completingId === r.id}
+                            id={`profile-cancel-res-${r.id}`}
+                          >
+                            {cancellingId === r.id ? 'Cancelling…' : 'Cancel'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--color-gray-400)', fontSize: 'var(--font-size-sm)' }}>—</span>
                       )}
                     </td>
                   </tr>

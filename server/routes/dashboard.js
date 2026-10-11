@@ -75,6 +75,7 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
           r.status,
           r.reserved_at,
           r.cancelled_at,
+          r.completed_at,
           u.name AS user_name,
           u.email AS user_email,
           ps.slot_number,

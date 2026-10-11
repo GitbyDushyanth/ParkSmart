@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS reservations (
                   CHECK (status IN ('active', 'cancelled', 'completed')),
   reserved_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   cancelled_at  TIMESTAMPTZ,
+  completed_at  TIMESTAMPTZ,
   CONSTRAINT chk_cancelled_at CHECK (
     (status = 'cancelled' AND cancelled_at IS NOT NULL)
     OR (status <> 'cancelled' AND cancelled_at IS NULL)

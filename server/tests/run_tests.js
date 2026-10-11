@@ -259,14 +259,189 @@ async function runTests() {
     assert('Dashboard has recentReservations list', Array.isArray(dashData.recentReservations));
 
     // ----------------------------------------------------
-    // 9. CLEANUP TEST USER
+    // 9. RESERVATION COMPLETION WORKFLOW (END-TO-END)
     // ----------------------------------------------------
-    console.log('\n[9] Cleanup');
-    const deleteRes = await fetch(`${BASE}/users/${driverId}`, {
+    console.log('\n[9] Reservation Completion Workflow');
+
+    // Register second driver for cross-user permission testing
+    const testDriver2Email = `test_driver2_${Date.now()}@parksmart.local`;
+    const reg2Res = await fetch(`${BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Second Test Driver',
+        email: testDriver2Email,
+        password: 'Password123!'
+      })
+    });
+    const reg2Data = await reg2Res.json();
+    assert('Register second driver succeeds with 201', reg2Res.status === 201);
+    const driver2Token = reg2Data.token;
+    const driver2Id = reg2Data.user.id;
+
+    // Admin creates dedicated test slots
+    const slotNum1 = `CP1-${Date.now().toString().slice(-4)}`;
+    const createSlot1Res = await fetch(`${BASE}/slots`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot_number: slotNum1, slot_type: 'regular' })
+    });
+    const createSlot1Data = await createSlot1Res.json();
+    assert('Admin creates dedicated test slot 1', createSlot1Res.status === 201);
+    const testSlot1Id = createSlot1Data.slot.id;
+
+    // Driver 1 books slot 1
+    const book1Res = await fetch(`${BASE}/reservations`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${driverToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot_id: testSlot1Id })
+    });
+    const book1Data = await book1Res.json();
+    assert('Driver 1 books slot 1 successfully', book1Res.status === 201 && book1Data.reservation?.status === 'active');
+    const res1Id = book1Data.reservation.id;
+
+    // Verify slot 1 is reserved
+    const slotsRes1 = await fetch(`${BASE}/slots`, {
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    const slotsData1 = await slotsRes1.json();
+    const slot1Before = slotsData1.slots.find(s => s.id === testSlot1Id);
+    assert('Slot 1 is marked reserved (is_reserved: true)', slot1Before?.is_reserved === true);
+
+    // Test Security: Unauthenticated request to complete
+    const unauthComplete = await fetch(`${BASE}/reservations/${res1Id}/complete`, {
+      method: 'PATCH'
+    });
+    assert('Security: Complete without token returns 401', unauthComplete.status === 401);
+
+    // Test Security: Driver 2 attempts to complete Driver 1's reservation
+    const crossDriverComplete = await fetch(`${BASE}/reservations/${res1Id}/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${driver2Token}` }
+    });
+    assert('Security: Driver 2 completing Driver 1 reservation returns 403 Forbidden', crossDriverComplete.status === 403);
+
+    // Test Invalid / Nonexistent IDs
+    const invalidIdComplete = await fetch(`${BASE}/reservations/notanumber/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    assert('Validation: Complete with non-numeric ID returns 400', invalidIdComplete.status === 400);
+
+    const nonExistentComplete = await fetch(`${BASE}/reservations/99999999/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    assert('Validation: Complete with non-existent reservation returns 404', nonExistentComplete.status === 404);
+
+    // Test Cancelled reservation cannot be completed
+    const slotNum2 = `CP2-${Date.now().toString().slice(-4)}`;
+    const createSlot2Res = await fetch(`${BASE}/slots`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot_number: slotNum2, slot_type: 'compact' })
+    });
+    const createSlot2Data = await createSlot2Res.json();
+    const testSlot2Id = createSlot2Data.slot.id;
+
+    const book2Res = await fetch(`${BASE}/reservations`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${driverToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot_id: testSlot2Id })
+    });
+    const book2Data = await book2Res.json();
+    const res2Id = book2Data.reservation.id;
+
+    const cancel2Res = await fetch(`${BASE}/reservations/${res2Id}/cancel`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    assert('Driver 1 cancels reservation 2', cancel2Res.status === 200);
+
+    const completeCancelledRes = await fetch(`${BASE}/reservations/${res2Id}/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    assert('State integrity: Attempting to complete cancelled reservation returns 409 Conflict', completeCancelledRes.status === 409);
+
+    // Test Driver 1 completes active reservation 1
+    const complete1Res = await fetch(`${BASE}/reservations/${res1Id}/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    const complete1Data = await complete1Res.json();
+    assert('Driver 1 completes active reservation returns 200', complete1Res.status === 200);
+    assert('Completed reservation status is "completed"', complete1Data.reservation?.status === 'completed');
+    assert('Completed reservation has completed_at timestamp', !!complete1Data.reservation?.completed_at);
+
+    // Verify slot 1 is released and is_reserved is false
+    const slotsRes2 = await fetch(`${BASE}/slots`, {
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    const slotsData2 = await slotsRes2.json();
+    const slot1After = slotsData2.slots.find(s => s.id === testSlot1Id);
+    assert('Slot 1 is released and available again (is_reserved: false)', slot1After?.is_reserved === false);
+
+    // Verify Driver 2 can now book the freed slot 1
+    const rebookRes = await fetch(`${BASE}/reservations`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${driver2Token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot_id: testSlot1Id })
+    });
+    const rebookData = await rebookRes.json();
+    assert('Released slot can be reserved again by Driver 2', rebookRes.status === 201);
+    const res3Id = rebookData.reservation.id;
+
+    // Test Double-completion rejection
+    const doubleCompleteRes = await fetch(`${BASE}/reservations/${res1Id}/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    assert('State integrity: Double-completion rejected with 409 Conflict', doubleCompleteRes.status === 409);
+
+    // Test Admin can complete active reservation 3
+    const adminCompleteRes = await fetch(`${BASE}/reservations/${res3Id}/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const adminCompleteData = await adminCompleteRes.json();
+    assert('Admin can complete active reservation on behalf of user', adminCompleteRes.status === 200 && adminCompleteData.reservation?.status === 'completed');
+
+    // Verify driver's reservation history shows completed_at
+    const driverMineRes = await fetch(`${BASE}/reservations/mine`, {
+      headers: { Authorization: `Bearer ${driverToken}` }
+    });
+    const driverMineData = await driverMineRes.json();
+    const mineCompleted = driverMineData.reservations.find(r => r.id === res1Id);
+    assert('Driver reservation history includes completed status and completed_at', mineCompleted?.status === 'completed' && !!mineCompleted?.completed_at);
+
+    // Verify admin dashboard statistics track completed reservations
+    const dashAfterRes = await fetch(`${BASE}/dashboard/stats`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const dashAfterData = await dashAfterRes.json();
+    assert('Admin dashboard tracks completed reservations metric', typeof dashAfterData.reservations?.completed === 'number' && dashAfterData.reservations?.completed > 0);
+
+    // ----------------------------------------------------
+    // 10. CLEANUP TEST DATA
+    // ----------------------------------------------------
+    console.log('\n[10] Cleanup');
+    const deleteDriver1Res = await fetch(`${BASE}/users/${driverId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${adminToken}` }
     });
-    assert('Admin cleanup: Delete test user succeeds with 200', deleteRes.status === 200);
+    assert('Admin cleanup: Delete driver 1 succeeds', deleteDriver1Res.status === 200);
+
+    const deleteDriver2Res = await fetch(`${BASE}/users/${driver2Id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    assert('Admin cleanup: Delete driver 2 succeeds', deleteDriver2Res.status === 200);
+
+    // Cleanup test slots
+    if (testSlot1Id || testSlot2Id) {
+      await pool.query('DELETE FROM parking_slots WHERE id IN ($1, $2)', [testSlot1Id, testSlot2Id]);
+    }
 
     console.log('\n====================================================');
     console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);

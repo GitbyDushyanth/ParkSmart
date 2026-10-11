@@ -30,6 +30,7 @@ export const reservationsAPI = {
   getAll: () => api.get('/reservations'),
   create: (slot_id) => api.post('/reservations', { slot_id }),
   cancel: (id) => api.patch(`/reservations/${id}/cancel`),
+  complete: (id) => api.patch(`/reservations/${id}/complete`),
 };
 
 // ─── Dashboard & Analytics ────────────────────────────────────────────────────

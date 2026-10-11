@@ -107,7 +107,7 @@ router.get('/:id', authenticate, async (req, res) => {
     // Fetch user's reservation history
     const reservationsResult = await pool.query(
       `SELECT
-         r.id, r.status, r.reserved_at, r.cancelled_at,
+         r.id, r.status, r.reserved_at, r.cancelled_at, r.completed_at,
          ps.slot_number, ps.slot_type
        FROM reservations r
        JOIN parking_slots ps ON ps.id = r.slot_id

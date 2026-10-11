@@ -146,6 +146,7 @@ ParkSmart/
 | GET | `/api/reservations` | Admin | All reservations across users |
 | POST | `/api/reservations` | JWT | Atomically reserve available slot |
 | PATCH | `/api/reservations/:id/cancel` | JWT | Cancel reservation (owner or admin) |
+| PATCH | `/api/reservations/:id/complete` | JWT | Complete active parking session & release slot (owner or admin) |
 | GET | `/api/dashboard/stats` | Admin | KPIs, 7-day timeline & recent activity |
 | GET | `/api/users` | Admin | User listing with search, filter & pagination |
 | GET | `/api/users/:id` | Admin/Self | User profile details & reservation history |
@@ -164,9 +165,10 @@ ParkSmart/
 | View parking slots | ✅ | ✅ |
 | Reserve available slots | ✅ | — |
 | View own reservation history | ✅ | ✅ |
+| Complete active parking session | ✅ | ✅ |
 | Cancel own active reservations | ✅ | ✅ |
 | Manage parking slot inventory | — | ✅ |
-| Cancel any reservation | — | ✅ |
+| Complete/Cancel any reservation | — | ✅ |
 | View all reservations | — | ✅ |
 | Operational dashboard & analytics | Basic | Full (with charts) |
 | User management & role assignment | — | ✅ |

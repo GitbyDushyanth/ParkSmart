@@ -436,6 +436,7 @@ export default function AdminUsers() {
                             <th>Type</th>
                             <th>Status</th>
                             <th>Reserved Date</th>
+                            <th>Ended Date</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -446,6 +447,15 @@ export default function AdminUsers() {
                               <td><span className={`badge badge-${r.status}`}>{r.status}</span></td>
                               <td style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-500)' }}>
                                 {new Date(r.reserved_at).toLocaleString()}
+                              </td>
+                              <td style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-500)' }}>
+                                {r.completed_at ? (
+                                  <span title="Completed at">{new Date(r.completed_at).toLocaleString()}</span>
+                                ) : r.cancelled_at ? (
+                                  <span title="Cancelled at">{new Date(r.cancelled_at).toLocaleString()}</span>
+                                ) : (
+                                  '—'
+                                )}
                               </td>
                             </tr>
                           ))}

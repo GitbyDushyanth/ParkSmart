@@ -9,7 +9,7 @@ router.get('/mine', authenticate, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT
-         r.id, r.status, r.reserved_at, r.cancelled_at,
+         r.id, r.status, r.reserved_at, r.cancelled_at, r.completed_at,
          ps.slot_number, ps.slot_type, ps.status AS slot_operational_status
        FROM reservations r
        JOIN parking_slots ps ON ps.id = r.slot_id
@@ -29,7 +29,7 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        r.id, r.status, r.reserved_at, r.cancelled_at,
+        r.id, r.status, r.reserved_at, r.cancelled_at, r.completed_at,
         u.name AS user_name, u.email AS user_email,
         ps.slot_number, ps.slot_type
       FROM reservations r
@@ -176,6 +176,89 @@ router.patch('/:id/cancel', authenticate, async (req, res) => {
     await client.query('ROLLBACK');
     console.error('Cancel reservation error:', err.message);
     return res.status(500).json({ error: 'Failed to cancel reservation' });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/reservations/:id/complete — Complete an active parking session
+router.patch('/:id/complete', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const isAdmin = req.user.role === 'admin';
+
+  const reservationId = parseInt(id);
+  if (isNaN(reservationId)) {
+    return res.status(400).json({ error: 'Invalid reservation ID' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Lock the reservation row for concurrency control
+    const resResult = await client.query(
+      `SELECT id, user_id, slot_id, status FROM reservations WHERE id = $1 FOR UPDATE`,
+      [reservationId]
+    );
+    if (resResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Reservation not found' });
+    }
+
+    const reservation = resResult.rows[0];
+
+    // 2. Ownership verification: Only the owner or an admin can complete
+    if (!isAdmin && reservation.user_id !== userId) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'You can only complete your own reservations' });
+    }
+
+    // 3. Status checks: Only active reservations can be completed
+    if (reservation.status === 'completed') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Reservation is already completed' });
+    }
+
+    if (reservation.status === 'cancelled') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Cannot complete a cancelled reservation' });
+    }
+
+    if (reservation.status !== 'active') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: `Reservation is ${reservation.status} and cannot be completed` });
+    }
+
+    // 4. Update the reservation status to completed and record completion timestamp
+    const { rows } = await client.query(
+      `UPDATE reservations
+       SET status = 'completed', completed_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [reservationId]
+    );
+
+    await client.query('COMMIT');
+
+    // 5. Fetch updated details with slot information
+    const fullRes = await pool.query(
+      `SELECT r.id, r.status, r.reserved_at, r.cancelled_at, r.completed_at,
+              ps.slot_number, ps.slot_type, ps.status AS slot_operational_status
+       FROM reservations r
+       JOIN parking_slots ps ON ps.id = r.slot_id
+       WHERE r.id = $1`,
+      [reservationId]
+    );
+
+    return res.json({
+      reservation: fullRes.rows[0] || rows[0],
+      message: 'Parking session completed successfully. The slot is now available.'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Complete reservation error:', err.message);
+    return res.status(500).json({ error: 'Failed to complete reservation' });
   } finally {
     client.release();
   }
