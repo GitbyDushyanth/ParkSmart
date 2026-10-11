@@ -1,10 +1,20 @@
 import api from './axios.js';
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+// ─── Auth & Profile ───────────────────────────────────────────────────────────
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
+  updateProfile: (data) => api.put('/auth/profile', data),
+  changePassword: (data) => api.put('/auth/change-password', data),
+};
+
+// ─── Admin Users Management ───────────────────────────────────────────────────
+export const usersAPI = {
+  getAll: (params) => api.get('/users', { params }),
+  getById: (id) => api.get(`/users/${id}`),
+  updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
+  deleteUser: (id) => api.delete(`/users/${id}`),
 };
 
 // ─── Slots ────────────────────────────────────────────────────────────────────
@@ -22,7 +32,7 @@ export const reservationsAPI = {
   cancel: (id) => api.patch(`/reservations/${id}/cancel`),
 };
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+// ─── Dashboard & Analytics ────────────────────────────────────────────────────
 export const dashboardAPI = {
   getStats: () => api.get('/dashboard/stats'),
 };
@@ -31,3 +41,4 @@ export const dashboardAPI = {
 export const healthAPI = {
   check: () => api.get('/health'),
 };
+

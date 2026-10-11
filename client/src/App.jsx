@@ -12,6 +12,8 @@ import MyReservations from './pages/MyReservations.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import AdminSlots from './pages/AdminSlots.jsx';
 import AdminReservations from './pages/AdminReservations.jsx';
+import AdminUsers from './pages/AdminUsers.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 
 function AppLayout({ children }) {
   return (
@@ -44,7 +46,7 @@ export default function App() {
             </PublicRoute>
           } />
 
-          {/* Driver routes */}
+          {/* User & shared authenticated routes */}
           <Route path="/dashboard" element={
             <PrivateRoute>
               <AppLayout>
@@ -63,6 +65,13 @@ export default function App() {
             <PrivateRoute>
               <AppLayout>
                 <MyReservations />
+              </AppLayout>
+            </PrivateRoute>
+          } />
+          <Route path="/profile" element={
+            <PrivateRoute>
+              <AppLayout>
+                <ProfilePage />
               </AppLayout>
             </PrivateRoute>
           } />
@@ -89,6 +98,13 @@ export default function App() {
               </AppLayout>
             </AdminRoute>
           } />
+          <Route path="/admin/users" element={
+            <AdminRoute>
+              <AppLayout>
+                <AdminUsers />
+              </AppLayout>
+            </AdminRoute>
+          } />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -97,3 +113,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

@@ -9,8 +9,10 @@
     "dev": "npm.cmd run dev:server & npm.cmd run dev:client",
     "start": "node server/index.js",
     "setup-db": "node server/db/setup.js",
+    "migrate": "node server/db/migrate.js",
     "seed": "node server/db/seed.js",
-    "create-admin": "node server/scripts/createAdmin.js"
+    "create-admin": "node server/scripts/createAdmin.js",
+    "test": "node server/tests/run_tests.js"
   },
   "keywords": [
     "parking",

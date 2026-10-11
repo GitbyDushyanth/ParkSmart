@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Car, LayoutDashboard, Calendar, Settings, LogOut, User, Shield } from 'lucide-react';
+import { Car, LayoutDashboard, Calendar, Settings, LogOut, User, Shield, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
@@ -12,7 +12,12 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+  const isActive = (path) => {
+    if (path === '/admin') {
+      return location.pathname === '/admin';
+    }
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
 
   return (
     <nav className="navbar">
@@ -28,25 +33,28 @@ export default function Navbar() {
           <div className="navbar-nav">
             {isAdmin ? (
               <>
-                <Link to="/admin" className={`navbar-link ${isActive('/admin') && !isActive('/admin/slots') && !isActive('/admin/reservations') ? 'active' : ''}`}>
+                <Link to="/admin" className={`navbar-link ${isActive('/admin') ? 'active' : ''}`} id="nav-admin-dashboard">
                   <LayoutDashboard size={16} /> Dashboard
                 </Link>
-                <Link to="/admin/slots" className={`navbar-link ${isActive('/admin/slots') ? 'active' : ''}`}>
+                <Link to="/admin/slots" className={`navbar-link ${isActive('/admin/slots') ? 'active' : ''}`} id="nav-admin-slots">
                   <Settings size={16} /> Slots
                 </Link>
-                <Link to="/admin/reservations" className={`navbar-link ${isActive('/admin/reservations') ? 'active' : ''}`}>
+                <Link to="/admin/reservations" className={`navbar-link ${isActive('/admin/reservations') ? 'active' : ''}`} id="nav-admin-reservations">
                   <Calendar size={16} /> Reservations
+                </Link>
+                <Link to="/admin/users" className={`navbar-link ${isActive('/admin/users') ? 'active' : ''}`} id="nav-admin-users">
+                  <Users size={16} /> Users
                 </Link>
               </>
             ) : (
               <>
-                <Link to="/dashboard" className={`navbar-link ${isActive('/dashboard') ? 'active' : ''}`}>
+                <Link to="/dashboard" className={`navbar-link ${isActive('/dashboard') ? 'active' : ''}`} id="nav-driver-dashboard">
                   <LayoutDashboard size={16} /> Dashboard
                 </Link>
-                <Link to="/slots" className={`navbar-link ${isActive('/slots') ? 'active' : ''}`}>
+                <Link to="/slots" className={`navbar-link ${isActive('/slots') ? 'active' : ''}`} id="nav-driver-slots">
                   <Car size={16} /> Find Parking
                 </Link>
-                <Link to="/my-reservations" className={`navbar-link ${isActive('/my-reservations') ? 'active' : ''}`}>
+                <Link to="/my-reservations" className={`navbar-link ${isActive('/my-reservations') ? 'active' : ''}`} id="nav-driver-reservations">
                   <Calendar size={16} /> My Reservations
                 </Link>
               </>
@@ -54,14 +62,22 @@ export default function Navbar() {
           </div>
 
           <div className="navbar-user">
-            <div className="navbar-avatar">
-              {isAdmin ? <Shield size={16} /> : user.name[0].toUpperCase()}
-            </div>
-            <span className="navbar-user-name">
-              {user.name}
-              {isAdmin && <span style={{ marginLeft: '6px', fontSize: '11px', background: 'rgba(79,70,229,0.3)', padding: '1px 6px', borderRadius: '4px', color: '#818CF8' }}>Admin</span>}
-            </span>
-            <button className="btn btn-ghost btn-sm" onClick={handleLogout} title="Logout">
+            <Link
+              to="/profile"
+              className={`navbar-link ${isActive('/profile') ? 'active' : ''}`}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', padding: '0.35rem 0.65rem' }}
+              title="View & Edit Profile"
+              id="nav-profile-link"
+            >
+              <div className="navbar-avatar">
+                {isAdmin ? <Shield size={16} /> : (user.name ? user.name[0].toUpperCase() : 'U')}
+              </div>
+              <span className="navbar-user-name">
+                {user.name}
+                {isAdmin && <span style={{ marginLeft: '6px', fontSize: '11px', background: 'rgba(79,70,229,0.3)', padding: '1px 6px', borderRadius: '4px', color: '#818CF8' }}>Admin</span>}
+              </span>
+            </Link>
+            <button className="btn btn-ghost btn-sm" onClick={handleLogout} title="Logout" id="logout-btn">
               <LogOut size={16} />
             </button>
           </div>
@@ -75,3 +91,4 @@ export default function Navbar() {
     </nav>
   );
 }
+
